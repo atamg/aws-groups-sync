@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Settings:
     AD_SERVER = os.getenv("AD_SERVER")
     AD_USER = os.getenv("AD_USER")

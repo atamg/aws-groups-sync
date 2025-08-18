@@ -1,9 +1,11 @@
-from ad_reader import connect_to_ad, get_aws_groups
+from .ad_reader import connect_to_ad, get_aws_groups
+from .config import Config
 
 
 def main():
-    conn = connect_to_ad()
-    groups = get_aws_groups(conn)
+    cfg = Config.load()
+    conn = connect_to_ad(cfg)
+    groups = get_aws_groups(conn, cfg)
     for group, members in groups.items():
         print(f"{group}:")
         for m in members:

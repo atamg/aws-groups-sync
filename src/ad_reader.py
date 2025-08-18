@@ -1,27 +1,31 @@
 from ldap3 import Server, Connection, ALL, SUBTREE
 from typing import Dict, List
-from config import Settings
 from ldap3.core.exceptions import LDAPException, LDAPBindError, LDAPExceptionError
 
 
-def connect_to_ad():
+def connect_to_ad(config):
     """
     Establishes a connection to the Active Directory server using GSSAPI for authentication.
     The connection would be established using current user's credentials.
     Returns: An active LDAP connection object.
     """
     try:
-        server = Server(Settings.AD_SERVER, use_ssl=True, port=636, get_info=ALL)
+        server = Server(
+            config.ad_server,
+            use_ssl=config.ad_use_ssl,
+            port=config.ad_port,
+            get_info=ALL,
+        )
         conn = Connection(
             server,
             authentication="SASL",
             sasl_mechanism="GSSAPI",
-            # user=Settings.AD_USER,
-            # password=Settings.AD_PASSWORD,
+            # user=config.ad_user,
+            # password=config.ad_password,
             auto_bind=True,
             raise_exceptions=True,
         )
-        print(f"Connected to AD server: {Settings.AD_SERVER}")
+        print(f"Connected to AD server: {config.ad_server}")
         return conn
     except LDAPBindError as e:
         print(f"Failed to connect to AD: {e}")
@@ -31,14 +35,14 @@ def connect_to_ad():
         raise
 
 
-def get_aws_groups(conn) -> Dict[str, List[str]]:
+def get_aws_groups(conn, config) -> Dict[str, List[str]]:
     """
     Fetches AD groups starting with AWS_ and their members.
     Returns: { group_name: [member_email1, member_email2, ...] }
     """
     try:
-        base_dn = Settings.AD_BASE_DN
-        filter = f"(&(objectClass=group)(cn={Settings.AD_GROUP_FILTER}))"
+        base_dn = config.ad_base_dn
+        filter = f"(&(objectClass=group)(cn={config.ad_group_filter}))"
         attributes = ["cn", "member"]
 
         search_result = conn.search(

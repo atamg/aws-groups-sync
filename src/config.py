@@ -35,6 +35,7 @@ class Config:
     gauth_scopes: Optional[List[str]]
     gauth_customer_id: Optional[str]
     gauth_project_id: Optional[str]
+    group_name_prefix: str
 
     @staticmethod
     def load() -> "Config":
@@ -71,6 +72,7 @@ class Config:
             gauth_project_id=os.getenv("GAUTH_PROJECT_ID", "").strip() or None,
             ad_use_ssl=os.getenv("AD_USE_SSL", "true").strip().lower() == "true",
             ad_port=int(os.getenv("AD_PORT", "636").strip()),
+            group_name_prefix=os.getenv("GROUP_NAME_PREFIX", "AWS_").strip(),
         )
         config.validate()
         return config

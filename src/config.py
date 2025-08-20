@@ -8,6 +8,8 @@ import os
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from typing import Optional, List
+from google.cloud import secretmanager
+
 
 load_dotenv()
 
@@ -19,6 +21,7 @@ class Config:
     log_level: str
     service_account_json_path: Optional[str]
     service_account_json_inline: Optional[str]
+    service_account_secret_manager: Optional[bool]
     ad_server: str
     ad_user: str
     ad_password: str
@@ -45,6 +48,12 @@ class Config:
             or None,
             service_account_json_inline=os.getenv("SERVICE_ACCOUNT_JSON", "").strip()
             or None,
+            service_account_secret_manager=os.getenv(
+                "SERVICE_ACCOUNT_SECRET_MANAGER", "true"
+            )
+            .strip()
+            .lower()
+            == "true",
             ad_server=os.getenv("AD_SERVER").strip(),
             ad_user=os.getenv("AD_USER").strip(),
             ad_password=os.getenv("AD_PASSWORD").strip(),
@@ -66,6 +75,21 @@ class Config:
         config.validate()
         return config
 
+    def load_credential_from_secret_manager(self, p_id, key, ver, type="json") -> dict:
+        client = secretmanager.SecretManagerServiceClient()
+        project_id = p_id
+        secret_id = key
+        secret_version = ver
+        secret_key_name = (
+            f"projects/{project_id}/secrets/{secret_id}/versions/{secret_version}"
+        )
+        response = client.access_secret_version(request={"name": secret_key_name})
+
+        if type == "json":
+            return json.loads(response.payload.data.decode("UTF-8"))
+        else:
+            return response.payload.data.decode("UTF-8")
+
     def get_service_account_info(self) -> dict:
         """
         Returns the service account JSON content, either from file path or inline env.
@@ -79,6 +103,22 @@ class Config:
                 return _json.load(f)
         if self.service_account_json_inline:
             return json.loads(self.service_account_json_inline)
+        if self.service_account_secret_manager:
+            if (
+                not self.gauth_project_id
+                or not self.gauth_secret_key_id
+                or not self.gauth_secret_ver
+            ):
+                raise ValueError(
+                    "Service account secret manager requires GAUTH_PROJECT_ID, "
+                    "GAUTH_SECRET_KEY_ID, and GAUTH_SECRET_VER to be set."
+                )
+            return self.load_credential_from_secret_manager(
+                self.gauth_project_id,
+                self.gauth_secret_key_id,
+                self.gauth_secret_ver,
+                self.gauth_secret_type,
+            )
         raise ValueError(
             "Service account credentials not found. Provide GOOGLE_APPLICATION_CREDENTIALS (path) "
             "or SERVICE_ACCOUNT_JSON (inline JSON)."
@@ -86,6 +126,8 @@ class Config:
 
     def validate(self) -> None:
         if not self.delegated_subject:
-            raise ValueError("GOOGLE_DELEGATED_SUBJECT is required.")
+            raise ValueError(
+                "Configu is missing; GOOGLE_DELEGATED_SUBJECT is required."
+            )
         if not self.group_domain:
-            raise ValueError("GROUP_DOMAIN is required.")
+            raise ValueError("Configu is missing; GROUP_DOMAIN is required.")

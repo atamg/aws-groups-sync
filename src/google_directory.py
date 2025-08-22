@@ -8,9 +8,11 @@ Responsibilities:
 - Add members (idempotent handling: ignore 409 alreadyExists)
 """
 
+import httplib2
 import logging
 from typing import Dict, Set, Optional, Iterable
 
+from google_auth_httplib2 import AuthorizedHttp
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -26,6 +28,7 @@ class GoogleDirectory:
         creds_info: dict,
         delegated_subject: str,
         google_api_scopes: Optional[Iterable[str]] = None,
+        http_timeout: float = 30.0,
     ):
         """
         :param creds_info: service account json (dict)
@@ -35,10 +38,16 @@ class GoogleDirectory:
             creds_info, scopes=google_api_scopes
         )
         delegated = creds.with_subject(delegated_subject)
+
+        # HTTP client with timeout
+        base_http = httplib2.Http(timeout=http_timeout)
+        authed_http = AuthorizedHttp(delegated, http=base_http)
+
         # cache_discovery=False avoids file writes in some environments
         self._svc = build(
-            "admin", "directory_v1", credentials=delegated, cache_discovery=False
+            "admin", "directory_v1", http=authed_http, cache_discovery=False
         )
+        self._num_retries = 3
 
     # ---------- Group listing ----------
 
@@ -54,7 +63,7 @@ class GoogleDirectory:
             .list(
                 domain=domain, customer=customer, pageToken=page_token, maxResults=200
             )
-            .execute()
+            .execute(num_retries=self._num_retries)
         )
 
     @retry((HttpError,), tries=5)
@@ -62,20 +71,24 @@ class GoogleDirectory:
         return (
             self._svc.members()
             .list(groupKey=group_email, pageToken=page_token, maxResults=200)
-            .execute()
+            .execute(num_retries=self._num_retries)
         )
 
     def get_all_groups_with_members(
         self,
-        *,
         domain: Optional[str] = None,
         customer: Optional[str] = None,
-        prefix: Optional[str] = None
+        prefix: Optional[str] = None,
     ) -> Dict[str, Set[str]]:
         """
         Returns: { group_email: {member_email, ...}, ... }
         """
-        LOGGER.info("Fetching Google groups (domain=%s, customer=%s)", domain, customer)
+        LOGGER.info(
+            "Fetching Google groups (domain=%s, customer=%s, prefix=%s)",
+            domain,
+            customer,
+            prefix,
+        )
         groups: Dict[str, Set[str]] = {}
         next_token: Optional[str] = None
 
@@ -137,7 +150,7 @@ class GoogleDirectory:
     ) -> dict:
         body = {
             "email": group_email,
-            "name": name or group_email.split("@", 1)[0],
+            "name": name,
             "description": description or "Provisioned by AD - Google sync",
         }
         LOGGER.info("Creating Google group %s", group_email)

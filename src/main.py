@@ -56,13 +56,6 @@ def main():
 
         LOGGER.info("Group synchronization completed successfully")
 
-        """""
-        for group, members in groups.items():
-            print(f"{group}:")
-            for m in members:
-                print(f"  - {m}")
-        """
-
     except Exception as e:
         print(f"An error occurred: {e}")
         exit(1)

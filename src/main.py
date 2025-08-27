@@ -43,14 +43,17 @@ def main():
         cfg.get_service_account_info()
 
         ad = ADconnection(cfg)
-        groups = ad.get_ad_groups(
-            cfg, ad_group_name="AWS_Additionalservice-Service_PowerUser"
-        )
+        groups = ad.get_ad_groups(cfg)
+        # ad_group_name="AWS_Additionalservice-Service_PowerUser"
+
+        LOGGER.info("Fetched %d groups from AD", len(groups))
 
         # Convert lists to sets for easier membership operations
+
         ad_groups = {k: set(v) for k, v in groups.items()}
 
         svc.union_update_group_members(ad_groups)
+
         LOGGER.info("Group synchronization completed successfully")
 
         """""

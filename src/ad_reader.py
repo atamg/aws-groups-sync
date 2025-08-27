@@ -47,7 +47,7 @@ class ADconnection:
         self, config, ad_group_name: Optional[str] = None
     ) -> Dict[str, List[str]]:
         """
-        Fetches AD groups starting with AWS_ and their members.
+        Fetches AD groups starting with 'ad_group_filter' and their members.
         Returns: { group_name: [member_email1, member_email2, ...] }
         """
         try:
@@ -63,7 +63,7 @@ class ADconnection:
                 search_filter=filter,
                 search_scope=SUBTREE,
                 attributes=attributes,
-                size_limit=1,
+                # size_limit=1,
             )
 
             if not search_result:
@@ -79,7 +79,7 @@ class ADconnection:
                 ]  # Filter out None
                 results[group_name] = members_emails
 
-            LOGGER.info(f"Found {len(results)} AWS groups.")
+            LOGGER.info(f"Found {len(results)} AD groups.")
             self._conn.unbind()
             return results
         except LDAPExceptionError as e:
